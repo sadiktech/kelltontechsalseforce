@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Salesforce__Basic_Authentication",
+            "typeId": "KelltonDataSource__c"
+        }
+    },
+    "id": "d6f35b83-8474-4857-bc79-420493f648d0",
+    "version": "5.2.0.0"
+}

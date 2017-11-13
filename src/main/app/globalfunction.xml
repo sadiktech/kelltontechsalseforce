@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <sfdc:config name="Salesforce__Basic_Authentication" username="sadik.ali@kelltontech.com" password="Tigo@1357" securityToken="OIm6VYReg5Ri0Qsnt6OSmu2B" doc:name="Salesforce: Basic Authentication"/>
+    <sub-flow name="Insert_Data">
+        <sfdc:create config-ref="Salesforce__Basic_Authentication"  doc:name="Insert kelltonData" type="KelltonDataSource__c">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+        <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
+    </sub-flow>
+    <sub-flow name="DataQuery">
+    <enricher source="#[payload]" target="#[variable:queryDataExist]" doc:name="Query Data Enricher">
+    	<processor-chain doc:name="Processor Chain">
+	        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Id FROM KelltonDataSource__c where Contact_Number__c='#[payload[0].Contact_Number__c]'" doc:name="Data Query"/>
+	        <set-payload value="#[org.apache.commons.collections.IteratorUtils.toList(payload)]" doc:name="Set Salseforce Response as Payload"/>
+	        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+	      </processor-chain>
+    </enricher>
+    </sub-flow>
+    <sub-flow name="update_data">
+        <flow-ref name="payload_enrich_id" doc:name="Payload_Id_Enrich_Flow Reference"/>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="KelltonDataSource__c" doc:name="Update record Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:update>
+        <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+     <sub-flow name="delete_data">
+        <flow-ref name="DataQuery" doc:name="Query Flow Reference"/>
+        <flow-ref name="payload_enrich_id" doc:name="Payload_Id_Enrich_Flow Reference"/>
+        <sfdc:delete config-ref="Salesforce__Basic_Authentication"  doc:name="Update record Salesforce">
+        </sfdc:delete>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="Data-Operation-SalseForce">
+        <dw:transform-message doc:name="Transform Message" metadata:id="a40c2318-d7d3-4746-b4e7-82daa4a9286b">
+            <dw:input-payload doc:sample="insert-json\InsertJson.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{	
+	First_Name__c: payload.fName,
+	Last_Name__c: payload.lName,
+	Contact_Number__c: payload.msisdn,
+//	Date_of_birth__c: payload.dob as :date {format: "dd-MM-yyyy"} as :string {format: "dd-mm-yyyy"},
+//	Created_On__c: payload.CreatedOn as :date {format: "DD-MM-YYYY"} as :string {format: "DD-MM-YYYY"},
+	Email__c: payload.Email
+}]]]></dw:set-payload>
+        </dw:transform-message>
+        <flow-ref name="DataQuery" doc:name="Query Flow Reference"/>
+        <choice doc:name="Choice">
+            <when expression="#[sessionVars.actionValidatonValue=='insert']">
+                <choice doc:name="Choice">
+                    <when expression="#[queryDataExist.size()==0]">
+                        <flow-ref name="Insert_Data" doc:name="Insert Data"/>
+                        <set-payload value="Your data has been processed successfully ! please find data unique refrence Id in system: #[payload.id]" doc:name="Set Payload"/>
+                    </when>
+                    <otherwise>
+                        <set-payload value="Data is already existing in system !!" doc:name="Set Payload"/>
+                    </otherwise>
+                </choice>
+                <!-- <async doc:name="Async-Insert"> -->
+
+                <!-- </async> -->
+                
+            </when>
+            <when expression="#[sessionVars.actionValidatonValue=='update']">
+                <choice doc:name="Choice">
+                    <when expression="#[queryDataExist.size()==0]">
+                        <set-payload value="Data requested for update is not available in system !" doc:name="Set Payload"/>
+                    </when>
+                    <otherwise>
+                        <flow-ref name="update_data" doc:name="Update Data"/>
+                        <set-payload value="Your data has been processed successfully ! please find data unique refrence Id in system: #[payload.id]" doc:name="Set Payload"/>
+                    </otherwise>
+                </choice>
+
+            </when>
+            <when expression="#[sessionVars.actionValidatonValue=='delete']">
+                <choice doc:name="Choice">
+                    <when expression="#[queryDataExist.size()==0]">
+                        <set-payload value="Requested data is not available in system !!" doc:name="Set Payload"/>
+                    </when>
+                    <otherwise>
+                        <flow-ref name="delete_data" doc:name="Delete Data"/>
+                    </otherwise>
+                </choice>
+
+            </when>
+        </choice>
+    </sub-flow>
+</mule>

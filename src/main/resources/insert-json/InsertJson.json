@@ -1,0 +1,13 @@
+{
+  "msisdn" : "9871143402",
+  "CreatedBy" : "Manish",
+  "CreatedOn": "01-01-1983",
+  "dob":"01-01-1983",
+  "Email" : "a@h.com",
+  "fName" : "Sadik",
+  "name" : "Sadik Ali",  
+  "lName" : "Ali",
+  "owner" : "Manish",
+  "LmodifiedBy" :"01-01-1983",
+  "action":"insert"
+ }

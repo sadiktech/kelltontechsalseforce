@@ -1,0 +1,16 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Insert-json"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "Salesforce__Basic_Authentication",
+            "typeId": "KelltonDataSource__c"
+        }
+    },
+    "id": "74d6c66f-22c1-4c2e-8cc8-f28ad55ce8f8",
+    "version": "5.2.0.0"
+}

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8091" doc:name="HTTP Listener Configuration"/>
+    <file:connector name="File" readFromDirectory="src/main/resources/uploadedFile" autoDelete="true" streaming="true" validateConnections="true" moveToDirectory="src/main/resources/readFile" doc:name="File"/>
+    <queued-asynchronous-processing-strategy name="Queued_Asynchronous_Processing_Strategy" maxThreads="100" minThreads="20" threadTTL="10000" doc:name="Queued Asynchronous Processing Strategy"/>
+    <flow name="KelltontechSolution-SalseForce" processingStrategy="synchronous">
+       <composite-source doc:name="Composite Source">
+            <http:listener config-ref="HTTP_Listener_Configuration" path="/SalseForceData" allowedMethods="POST" doc:name="HTTP"/>
+            <file:inbound-endpoint path="src/main/resources/uploadedFile" connector-ref="File" responseTimeout="10000" doc:name="File prrocess"/>
+            <vm:inbound-endpoint exchange-pattern="one-way" path="dataque" doc:name="dataque VM"/>
+        </composite-source>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <choice doc:name="Choice">
+             <when expression="#[message.inboundProperties['MULE_ENDPOINT']]">
+                <dw:transform-message doc:name="Action Valriable" metadata:id="f64ef5c2-5bbd-43d7-bced-faa307b52d79">
+                    <dw:input-payload doc:sample="insert-json\InsertJson.json" mimeType="application/json"/>
+                    <dw:set-session-variable variableName="actionValidatonValue"><![CDATA[%dw 1.0
+						%output application/java
+						
+						%var actionCheck = payload.action
+						
+						---
+						actionCheck
+						
+						]]></dw:set-session-variable>
+                </dw:transform-message>
+                <logger message="VM #[payload]" level="INFO" doc:name="Vm Logger"/>
+                <flow-ref name="VM-Process-Subflow" doc:name="Vm Flow Reference"/>
+                <vm:outbound-endpoint exchange-pattern="one-way" path="resposneQueue" doc:name="VM"/>
+
+            </when>
+            <when expression="#[message.inboundProperties['http.scheme']]">
+                
+                <dw:transform-message doc:name="Action Valriable">
+                    <dw:set-session-variable variableName="actionValidatonValue"><![CDATA[%dw 1.0
+					%output application/java
+					%var actionCheck = payload.action
+					
+					---
+					actionCheck]]></dw:set-session-variable>
+
+                </dw:transform-message>
+                <logger message="Http : #[payload]" level="INFO" doc:name="http Logger"/>
+                <flow-ref name="Http-Process-Subflow" doc:name="Http Flow Reference"/>
+
+            </when>
+            <when expression="#[message.inboundProperties['originalDirectory']]">
+                <logger message="File:  #[payload]" level="INFO" doc:name="file  Logger"/>
+                <flow-ref name="File-Process-Subflow" doc:name="file Flow Reference"/>
+                <set-payload value="#[payload]" doc:name="Set Payload"/>
+            </when>
+            <otherwise>
+                <logger message="This data is not valid!!" level="INFO" doc:name="Else Logger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="utilflowChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+
+        
+    </flow>
+    <sub-flow name="File-Process-Subflow">
+        <async processingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Async">
+            <logger message="File-Process  Payload #[payload]" level="INFO" doc:name="Logger"/>
+            <splitter expression="#[payload.split(&quot;\n&quot;)]" doc:name="Splitter"/>
+            <dw:transform-message doc:name="Action Valriable">
+                <dw:set-session-variable variableName="actionValidatonValue"><![CDATA[%dw 1.0
+				%output application/java
+				%var actionCheck = payload.action
+				
+				---
+				actionCheck]]></dw:set-session-variable>
+
+            </dw:transform-message>
+            <logger message="File values :  #[payload]" level="INFO" doc:name="Logger"/>
+        </async>
+    </sub-flow>
+    <sub-flow name="Http-Process-Subflow">
+        <logger message="http-Process  Payload #[payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="Data-Operation-SalseForce" doc:name="Flow Reference"/>
+    </sub-flow>
+    <sub-flow name="VM-Process-Subflow">
+        <logger message="VM-Process-Subflow : #[payload]" level="INFO" doc:name="Logger"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <flow-ref name="Data-Operation-SalseForce" doc:name="Flow Reference"/>
+    </sub-flow>
+    <flow name="kelltontechsalseforceFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/VMInsert" doc:name="HTTP" allowedMethods="POST"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <request-reply doc:name="Request-Reply">
+            <vm:outbound-endpoint exchange-pattern="one-way" path="dataque" doc:name="VM-Data-process-request"/>
+            <vm:inbound-endpoint exchange-pattern="one-way" path="resposneQueue" doc:name="VM-resposne-queue"/>
+        </request-reply>
+
+    </flow>
+    
+</mule>

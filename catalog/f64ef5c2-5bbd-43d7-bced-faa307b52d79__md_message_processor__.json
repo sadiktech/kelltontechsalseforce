@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "Insert-json"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "f64ef5c2-5bbd-43d7-bced-faa307b52d79",
+    "version": "5.2.0.0"
+}
